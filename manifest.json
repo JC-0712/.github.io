@@ -1,0 +1,17 @@
+{
+  "name": "JC材料系统",
+  "short_name": "建材管理",
+  "description": "JC材料系统 - AI建筑材料入库管理系统",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a56db",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a56db'/><text y='.9em' font-size='80' x='10'>🏗️</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}

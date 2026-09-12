@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a56db">
+<title>JC材料系统</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- WorkBuddy Cloud Service SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
+<script>
+  // 由 cloud-service 激活流程注入；禁止硬编码或从他处取
+  window.PUBLIC_CONFIG = {
+    endpoint: "https://jc-material-system.app.workbuddy.host",
+    publishableKey: "wbpk_nZPEaWpHt7r0eGDoR3Le0U_VEamlYExGUgmLiJYLu5pGLvy3JOF3kRd"
+  };
+</script>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="appLoading">
+  <div class="spinner"></div>
+  <div class="loading-text">JC材料系统启动中...</div>
+</div>
+
+<!-- LOGIN / SIGNUP -->
+<div class="login-overlay" id="loginOverlay" style="display:none;">
+  <div class="login-card">
+    <div class="login-logo">🏗️ <span>JC材料系统</span></div>
+    <div class="login-sub">云端同步 · 多端互通</div>
+    <div class="login-tabs">
+      <button class="login-tab active" data-tab="signin" onclick="switchAuthTab('signin')">登录</button>
+      <button class="login-tab" data-tab="signup" onclick="switchAuthTab('signup')">注册</button>
+    </div>
+
+    <!-- 登录面板 -->
+    <div class="login-panel" id="panel-signin">
+      <div class="form-group"><label>邮箱</label><input type="email" class="form-control" id="signinEmail" placeholder="your@email.com"></div>
+      <div class="form-group"><label>密码</label><input type="password" class="form-control" id="signinPassword" placeholder="••••••••"></div>
+      <button class="btn btn-primary btn-block" onclick="doSignIn()">🔑 邮箱密码登录</button>
+      <div class="login-divider"><span>或</span></div>
+      <button class="btn btn-outline btn-block" onclick="doOtpLogin()">📧 邮箱验证码登录</button>
+      <div class="login-otp" id="otpArea" style="display:none;">
+        <div class="form-group"><label>验证码</label><input type="text" class="form-control" id="otpToken" placeholder="6位数字" maxlength="6"></div>
+        <button class="btn btn-outline btn-block" onclick="doVerifyOtp()">✅ 验证并登录</button>
+      </div>
+      <div class="login-foot"><a href="javascript:void(0)" onclick="doForgotPassword()">忘记密码？</a></div>
+    </div>
+
+    <!-- 注册面板 -->
+    <div class="login-panel" id="panel-signup" style="display:none;">
+      <div class="alert alert-info"><span class="alert-icon">ℹ️</span>注册需要先用邮箱接收验证码，再设置密码。</div>
+      <div class="form-group"><label>邮箱</label><input type="email" class="form-control" id="signupEmail" placeholder="your@email.com"></div>
+      <button class="btn btn-outline btn-block" onclick="doSendSignupOtp()">📨 发送验证码</button>
+      <div class="login-otp" id="signupOtpArea" style="display:none;">
+        <div class="form-group"><label>验证码</label><input type="text" class="form-control" id="signupOtpToken" placeholder="6位数字" maxlength="6"></div>
+        <div class="form-group"><label>设置密码（至少 6 位）</label><input type="password" class="form-control" id="signupPassword" placeholder="••••••••"></div>
+        <button class="btn btn-primary btn-block" onclick="doSignUp()">✅ 创建账号</button>
+      </div>
+    </div>
+
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- TOP NAV -->
+<nav class="top-nav">
+  <div class="logo">
+    <div class="logo-icon">🏗️</div>
+    <span>JC材料系统</span>
+    <span class="logo-sub">AI建材入库管理</span>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" onclick="toggleSync()">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncLabel">已同步</span>
+    </button>
+    <button class="nav-btn mobile-hide" onclick="showModal('exportModal')">📤 导出</button>
+    <span class="nav-btn" id="userBadge" style="pointer-events:none;"></span>
+    <button class="nav-btn" id="signOutBtn" onclick="doSignOut()" style="display:none;">退出</button>
+    <button class="nav-btn" id="menuToggle" onclick="toggleSidebar()">☰</button>
+  </div>
+</nav>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-menu">
+    <div class="menu-item active" data-page="dashboard" onclick="navigateTo('dashboard')">
+      <span class="icon">📊</span> 控制台
+    </div>
+    <div class="menu-item" data-page="inbound" onclick="navigateTo('inbound')">
+      <span class="icon">📥</span> 材料入库
+    </div>
+    <div class="menu-item" data-page="inventory" onclick="navigateTo('inventory')">
+      <span class="icon">📦</span> 库存管理
+    </div>
+    <div class="menu-item" data-page="supplier" onclick="navigateTo('supplier')">
+      <span class="icon">🏢</span> 供应商图册
+    </div>
+    <div class="menu-item" data-page="samples" onclick="navigateTo('samples')">
+      <span class="icon">🎨</span> 项目定样
+    </div>
+    <div class="menu-item" data-page="warnings" onclick="navigateTo('warnings')">
+      <span class="icon">⚠️</span> 库存预警
+      <span class="menu-badge" id="warnBadge">0</span>
+    </div>
+    <div class="menu-item" data-page="stats" onclick="navigateTo('stats')">
+      <span class="icon">📈</span> 统计报表
+    </div>
+    <div class="menu-item" data-page="settings" onclick="navigateTo('settings')">
+      <span class="icon">⚙️</span> 系统设置
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="version">v2.0.0 · 支持离线使用</div>
+  </div>
+</aside>
+
+<!-- OVERLAY for mobile sidebar -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+
+  <!-- ===== DASHBOARD ===== -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <div class="page-title">📊 控制台总览</div>
+      <span class="date-label" id="dashboardDate"></span>
+    </div>
+    <div class="stats-grid" id="dashStats">
+      <div class="stat-card"><div class="stat-icon" style="background:#dbeafe;">📦</div>
+        <div class="stat-info"><div class="value" id="statTotal">0</div><div class="label">入库记录总数</div><div class="change up" id="statTotalChange">本月新增 0 条</div></div>
+      </div>
+      <div class="stat-card"><div class="stat-icon" style="background:#d1fae5;">💰</div>
+        <div class="stat-info"><div class="value" id="statValue">¥0</div><div class="label">库存总价值</div><div class="change" id="statValueChange"></div></div>
+      </div>
+      <div class="stat-card"><div class="stat-icon" style="background:#fef3c7;">🏢</div>
+        <div class="stat-info"><div class="value" id="statSupplier">0</div><div class="label">供应商数量</div><div class="change" id="statSupChange"></div></div>
+      </div>
+      <div class="stat-card"><div class="stat-icon" style="background:#fee2e2;">⚠️</div>
+        <div class="stat-info"><div class="value" id="statWarn" style="color:var(--danger);">0</div><div class="label">库存预警项</div><div class="change down" id="statWarnChange"></div></div>
+      </div>
+    </div>
+    <div id="dashWarnAlerts"></div>
+    <div class="charts-grid">
+      <div class="card"><div class="card-title"><span class="icon">📊</span> 近30天入库趋势</div><div class="chart-container"><canvas id="trendChart"></canvas></div></div>
+      <div class="card"><div class="card-title"><span class="icon">🥧</span> 材料类型分布</div><div class="chart-container"><canvas id="typeChart"></canvas></div></div>
+    </div>
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title"><span class="icon">🕐</span> 最近入库记录</div>
+      <div class="table-wrap"><table><thead><tr><th>材料名称</th><th>类型</th><th>数量</th><th>供应商</th><th>入库时间</th><th>操作</th></tr></thead><tbody id="recentTableBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ===== INBOUND ===== -->
+  <div class="page" id="page-inbound">
+    <div class="page-header">
+      <div class="page-title">📥 材料入库</div>
+      <button class="btn btn-outline btn-sm" onclick="showModal('batchModal')">📋 批量入库</button>
+    </div>
+    <div class="inbound-grid">
+      <!-- Left -->
+      <div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title"><span class="icon">📸</span> 上传材料图片</div>
+          <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📷</div>
+            <div class="upload-text">点击拍照或选择图片</div>
+            <div class="upload-hint">支持 JPG、PNG、WEBP，最大 10MB</div>
+            <input type="file" id="imgInput" accept="image/*" capture="environment" onchange="handleImageUpload(this)">
+          </div>
+          <img class="img-preview" id="imgPreview" src="" alt="预览">
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="runAIRecognition()" id="aiBtn" disabled>🤖 AI识别分析</button>
+            <button class="btn btn-outline btn-sm" onclick="clearImage()">🗑️ 清除</button>
+          </div>
+        </div>
+        <div class="card" id="aiResultCard" style="display:none;">
+          <div class="card-title"><span class="icon">🤖</span> AI识别结果</div>
+          <div class="ai-result" id="aiResultContent"></div>
+        </div>
+        <div class="card" id="storageCard" style="display:none;margin-top:16px;">
+          <div class="card-title"><span class="icon">📍</span> 智能存储位置推荐</div>
+          <div id="storageContent"></div>
+        </div>
+      </div>
+      <!-- Right: Form -->
+      <div class="card">
+        <div class="card-title"><span class="icon">📝</span> 入库信息录入</div>
+        <div class="form-grid">
+          <div class="form-group full"><label>材料名称 *</label><input type="text" class="form-control" id="matName" placeholder="请输入材料名称"></div>
+          <div class="form-group"><label>材料类型 *</label>
+            <select class="form-control" id="matType">
+              <option value="">请选择类型</option>
+              <option>钢筋钢材</option><option>水泥砂浆</option><option>瓷砖石材</option><option>木材板材</option>
+              <option>防水材料</option><option>保温材料</option><option>管道管件</option><option>电气材料</option>
+              <option>涂料油漆</option><option>玻璃材料</option><option>门窗型材</option><option>装饰材料</option><option>其他</option>
+            </select>
+          </div>
+          <div class="form-group"><label>规格型号</label><input type="text" class="form-control" id="matSpec" placeholder="如：300×600mm、φ16"></div>
+          <div class="form-group"><label>数量 *</label><input type="number" class="form-control" id="matQty" placeholder="0" min="0"></div>
+          <div class="form-group"><label>单位</label>
+            <select class="form-control" id="matUnit">
+              <option>块</option><option>件</option><option>吨</option><option>米</option><option>平米</option>
+              <option>立方米</option><option>袋</option><option>桶</option><option>套</option><option>根</option><option>卷</option><option>箱</option>
+            </select>
+          </div>
+          <div class="form-group"><label>单价（元）*</label><input type="number" class="form-control" id="matPrice" placeholder="0.00" min="0" step="0.01"></div>
+          <div class="form-group"><label>存储位置 *</label><input type="text" class="form-control" id="matLocation" placeholder="如：A区-03货架"></div>
+          <div class="form-group"><label>表面工艺处理</label><input type="text" class="form-control" id="matSurface" placeholder="如：抛光、哑光、喷砂"></div>
+          <div class="form-group"><label>颜色/色号</label><input type="text" class="form-control" id="matColor" placeholder="如：象牙白、#F5F5F5"></div>
+          <div class="form-group"><label>供应商 *</label><select class="form-control" id="matSupplier"><option value="">请选择供应商</option></select></div>
+          <div class="form-group"><label>联系人</label><input type="text" class="form-control" id="matContact" placeholder="联系人姓名"></div>
+          <div class="form-group"><label>联系电话</label><input type="tel" class="form-control" id="matPhone" placeholder="手机/座机"></div>
+          <div class="form-group"><label>批次号</label><input type="text" class="form-control" id="matBatch" placeholder="自动生成"></div>
+          <div class="form-group"><label>预警数量</label><input type="number" class="form-control" id="matThreshold" placeholder="低于此值预警" min="0"></div>
+          <div class="form-group full"><label>备注说明</label><textarea class="form-control" id="matRemark" placeholder="其他补充信息..."></textarea></div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-lg" style="flex:1;min-width:120px;" onclick="submitInbound()">✅ 确认入库</button>
+          <button class="btn btn-outline" onclick="clearForm()">🔄 重置</button>
+          <button class="btn btn-outline" onclick="markAsSample()" title="定样留存">🎨 定样</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INVENTORY ===== -->
+  <div class="page" id="page-inventory">
+    <div class="page-header">
+      <div class="page-title">📦 库存管理</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-success btn-sm" onclick="exportExcel()">📥 Excel导出</button>
+        <button class="btn btn-primary btn-sm" onclick="navigateTo('inbound')">+ 新建入库</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="search-bar">
+        <div class="search-input">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="form-control" id="searchInput" placeholder="搜索材料名称、类型、供应商..." oninput="filterInventory()">
+        </div>
+        <div class="filter-group">
+          <select class="form-control" id="filterType" onchange="filterInventory()" style="min-width:130px;">
+            <option value="">全部类型</option>
+            <option>钢筋钢材</option><option>水泥砂浆</option><option>瓷砖石材</option><option>木材板材</option>
+            <option>防水材料</option><option>保温材料</option><option>管道管件</option><option>电气材料</option>
+            <option>涂料油漆</option><option>玻璃材料</option><option>门窗型材</option><option>装饰材料</option><option>其他</option>
+          </select>
+          <select class="form-control" id="filterSupplier" onchange="filterInventory()" style="min-width:130px;">
+            <option value="">全部供应商</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <label class="filter-label">💰 价格区间筛选</label>
+        <div class="price-filter">
+          <input type="number" class="form-control price-input" id="priceMin" placeholder="最低价" min="0" oninput="filterInventory()">
+          <span>—</span>
+          <input type="number" class="form-control price-input" id="priceMax" placeholder="最高价" min="0" oninput="filterInventory()">
+          <span class="unit-label">元</span>
+          <button class="btn btn-sm btn-outline" onclick="clearPriceFilter()">清除</button>
+          <div style="margin-left:auto;font-size:13px;color:var(--text-light);">共 <b id="inventoryCount">0</b> 条</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+            <th>图片</th><th>材料名称</th><th>类型</th><th class="mobile-hide">规格</th>
+            <th>数量</th><th>单价</th><th class="mobile-hide">总价</th><th class="mobile-hide">存储位置</th>
+            <th class="mobile-hide">供应商</th><th class="mobile-hide">入库时间</th><th>操作</th>
+          </tr></thead>
+          <tbody id="inventoryTableBody"></tbody>
+        </table>
+      </div>
+      <div id="inventoryEmpty" class="empty-state" style="display:none;">
+        <div class="icon">📦</div><div class="title">暂无库存记录</div><div class="desc">请先进行材料入库操作</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SUPPLIER ===== -->
+  <div class="page" id="page-supplier">
+    <div class="page-header">
+      <div class="page-title">🏢 供应商图册资料库</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="showModal('addCategoryModal')">+ 新建分类</button>
+        <button class="btn btn-primary btn-sm" onclick="showModal('addSupplierModal')">+ 供应商</button>
+        <button class="btn btn-success btn-sm" onclick="showModal('addCatalogModal')">📚 上传图册</button>
+      </div>
+    </div>
+    <div class="supplier-layout">
+      <div class="supplier-sidebar-col">
+        <div class="card supplier-side-card">
+          <div class="card-title"><span class="icon">🗂️</span> 供应商分类</div>
+          <div class="search-input" style="margin-bottom:12px;">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="form-control" id="supplierSearch" placeholder="搜索供应商..." oninput="filterSupplierTree()">
+          </div>
+          <div id="categoryTree" class="cat-tree"></div>
+          <button class="btn btn-outline btn-block" style="margin-top:12px;" onclick="showModal('addCategoryModal')">➕ 新建分类</button>
+        </div>
+      </div>
+      <div class="supplier-content-col">
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:16px;font-weight:700;" id="currentCategoryTitle">全部图册</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select class="form-control" id="catalogFilter" onchange="filterCatalogs()" style="min-width:120px;font-size:13px;">
+                <option value="">全部状态</option>
+                <option value="有库存">有库存</option>
+                <option value="无库存">无库存</option>
+              </select>
+              <div style="display:flex;border:1.5px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;">
+                <button onclick="setCatalogView('grid')" id="gridViewBtn" class="view-btn active-view">⊞</button>
+                <button onclick="setCatalogView('list')" id="listViewBtn" class="view-btn">≡</button>
+              </div>
+            </div>
+          </div>
+          <div id="catalogGridView" class="catalog-grid"></div>
+          <div id="catalogListView" style="display:none;">
+            <div class="table-wrap"><table>
+              <thead><tr><th>图册名称</th><th>供应商</th><th>分类</th><th>价格区间</th><th>库存状态</th><th>批次</th><th>操作</th></tr></thead>
+              <tbody id="catalogListBody"></tbody>
+            </table></div>
+          </div>
+          <div id="catalogEmpty" class="empty-state" style="display:none;">
+            <div class="icon">📚</div><div class="title">暂无图册资料</div><div class="desc">点击上传图册开始添加</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SAMPLES ===== -->
+  <div class="page" id="page-samples">
+    <div class="page-header">
+      <div class="page-title">🎨 项目定样留存</div>
+      <button class="btn btn-primary btn-sm" onclick="showModal('addSampleModal')">+ 新增定样</button>
+    </div>
+    <div class="search-bar">
+      <div class="search-input" style="max-width:300px;">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="form-control" id="sampleSearch" placeholder="搜索定样记录..." oninput="filterSamples()">
+      </div>
+      <select class="form-control" id="sampleFilter" onchange="filterSamples()" style="width:160px;">
+        <option value="">全部项目</option>
+      </select>
+    </div>
+    <div class="sample-grid" id="sampleGrid"></div>
+    <div id="sampleEmpty" class="empty-state" style="display:none;">
+      <div class="icon">🎨</div><div class="title">暂无定样记录</div><div class="desc">入库时点击"定样"按钮，或在此页面新增</div>
+    </div>
+  </div>
+
+  <!-- ===== WARNINGS ===== -->
+  <div class="page" id="page-warnings">
+    <div class="page-header">
+      <div class="page-title">⚠️ 库存预警</div>
+      <button class="btn btn-outline btn-sm" onclick="renderWarnings()">🔄 刷新</button>
+    </div>
+    <div class="alert alert-warning"><span class="alert-icon">⚠️</span><span>以下材料库存已低于预警值，请及时补货！</span></div>
+    <div id="warningList"></div>
+    <div id="warningEmpty" class="empty-state" style="display:none;">
+      <div class="icon">✅</div><div class="title">所有库存正常</div><div class="desc">当前无库存预警项目</div>
+    </div>
+  </div>
+
+  <!-- ===== STATS ===== -->
+  <div class="page" id="page-stats">
+    <div class="page-header">
+      <div class="page-title">📈 统计报表</div>
+      <div style="display:flex;gap:8px;">
+        <select class="form-control" id="statsRange" onchange="updateStats()" style="width:130px;">
+          <option value="7">近7天</option>
+          <option value="30" selected>近30天</option>
+          <option value="90">近90天</option>
+          <option value="365">近一年</option>
+        </select>
+        <button class="btn btn-success btn-sm" onclick="exportExcel()">📥 导出</button>
+      </div>
+    </div>
+    <div class="stats-grid" id="statsCards"></div>
+    <div class="charts-grid" style="margin-top:20px;">
+      <div class="card"><div class="card-title"><span class="icon">📊</span> 入库趋势</div><div class="chart-container"><canvas id="statsLineChart"></canvas></div></div>
+      <div class="card"><div class="card-title"><span class="icon">🏷️</span> 材料类型占比</div><div class="chart-container"><canvas id="statsPieChart"></canvas></div></div>
+      <div class="card"><div class="card-title"><span class="icon">🏢</span> 供应商采购占比</div><div class="chart-container"><canvas id="statsBarChart"></canvas></div></div>
+      <div class="card"><div class="card-title"><span class="icon">💰</span> 价格区间分布</div><div class="chart-container"><canvas id="statsPriceChart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div class="page" id="page-settings">
+    <div class="page-title" style="margin-bottom:20px;">⚙️ 系统设置</div>
+    <div style="display:grid;gap:20px;max-width:700px;">
+      <div class="card">
+        <div class="card-title"><span class="icon">🏢</span> 公司信息</div>
+        <div class="form-grid">
+          <div class="form-group"><label>公司名称</label><input type="text" class="form-control" id="companyName" value="JC材料系统"></div>
+          <div class="form-group"><label>仓库名称</label><input type="text" class="form-control" id="warehouseName" value="主仓库"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="icon">🔊</span> 语音设置</div>
+        <div class="form-grid">
+          <div class="form-group"><label>语音提示</label>
+            <select class="form-control" id="ttsEnabled"><option value="1">开启</option><option value="0">关闭</option></select>
+          </div>
+          <div class="form-group"><label>语音速率 <span id="ttsRateVal">1.0</span>x</label>
+            <input type="range" min="0.5" max="2" step="0.1" value="1" id="ttsRate" class="form-control" style="padding:6px 0;" oninput="document.getElementById('ttsRateVal').textContent=parseFloat(this.value).toFixed(1)">
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="testTTS()">🔊 测试语音</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="icon">⚠️</span> 预警设置</div>
+        <div class="form-group"><label>默认预警数量</label>
+          <input type="number" class="form-control" id="defaultThreshold" value="10" min="0" style="max-width:200px;">
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="icon">💾</span> 数据管理</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="exportExcel()">📥 导出Excel</button>
+          <button class="btn btn-outline" onclick="exportJSON()">💾 备份数据</button>
+          <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 恢复数据</button>
+          <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空数据</button>
+        </div>
+        <div style="margin-top:12px;font-size:13px;color:var(--text-light);">数据量：<span id="dataSize">计算中...</span></div>
+        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="doImportJSON(this)">
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" id="bottomNav">
+  <div class="bottom-nav-item active" data-page="dashboard" onclick="navigateTo('dashboard')"><span class="icon">📊</span>控制台</div>
+  <div class="bottom-nav-item" data-page="inbound" onclick="navigateTo('inbound')"><span class="icon">📥</span>入库</div>
+  <div class="bottom-nav-item" data-page="inventory" onclick="navigateTo('inventory')"><span class="icon">📦</span>库存</div>
+  <div class="bottom-nav-item" data-page="supplier" onclick="navigateTo('supplier')"><span class="icon">🏢</span>图册</div>
+  <div class="bottom-nav-item" data-page="stats" onclick="navigateTo('stats')"><span class="icon">📈</span>统计</div>
+</nav>
+
+<!-- FAB -->
+<button class="mobile-fab" onclick="navigateTo('inbound')" title="快速入库">+</button>
+
+<!-- TTS BAR -->
+<div class="tts-bar" id="ttsBar">
+  <span class="tts-icon">🔊</span>
+  <span id="ttsText">语音提示...</span>
+  <button class="tts-close" onclick="stopTTS()">✕</button>
+</div>
+
+<!-- NOTIFICATION -->
+<div class="notification" id="notification">
+  <span class="notif-icon" id="notifIcon">✅</span>
+  <div class="notif-body">
+    <div class="notif-title" id="notifTitle">成功</div>
+    <div class="notif-msg" id="notifMsg"></div>
+  </div>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="max-width:800px;">
+    <div class="modal-header"><div class="modal-title">📋 材料详情</div><button class="modal-close" onclick="closeModal('detailModal')">✕</button></div>
+    <div class="modal-body" id="detailContent"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" onclick="editRecord()">✏️ 编辑</button>
+      <button class="btn btn-success btn-sm" onclick="closeModal('detailModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header"><div class="modal-title">✏️ 编辑材料信息</div><button class="modal-close" onclick="closeModal('editModal')">✕</button></div>
+    <div class="modal-body"><div class="form-grid" id="editFormContent"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveEdit()">💾 保存修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header"><div class="modal-title">📤 导出数据</div><button class="modal-close" onclick="closeModal('exportModal')">✕</button></div>
+    <div class="modal-body">
+      <div style="display:grid;gap:12px;">
+        <label class="check-label"><input type="checkbox" id="expInventory" checked> 入库记录</label>
+        <label class="check-label"><input type="checkbox" id="expSupplier" checked> 供应商信息</label>
+        <label class="check-label"><input type="checkbox" id="expSamples"> 定样记录</label>
+        <div class="form-group"><label>导出格式</label>
+          <select class="form-control" id="expFormat"><option value="excel">Excel (.xlsx)</option><option value="json">JSON备份</option></select>
+        </div>
+        <div class="form-group"><label>日期范围</label>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <input type="date" class="form-control" id="expDateFrom">
+            <span>至</span>
+            <input type="date" class="form-control" id="expDateTo">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('exportModal')">取消</button>
+      <button class="btn btn-success" onclick="doExport()">📥 开始导出</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Supplier Modal -->
+<div class="modal-overlay" id="addSupplierModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header"><div class="modal-title">➕ 添加供应商</div><button class="modal-close" onclick="closeModal('addSupplierModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>供应商名称 *</label><input type="text" class="form-control" id="supName" placeholder="供应商公司名称"></div>
+        <div class="form-group"><label>所属分类 *</label><select class="form-control" id="supCategory"><option value="">请选择分类</option></select></div>
+        <div class="form-group"><label>联系人</label><input type="text" class="form-control" id="supContact" placeholder="联系人姓名"></div>
+        <div class="form-group"><label>联系电话</label><input type="tel" class="form-control" id="supPhone" placeholder="手机/座机"></div>
+        <div class="form-group"><label>主营类别</label><input type="text" class="form-control" id="supMainBiz" placeholder="如：石材、瓷砖"></div>
+        <div class="form-group"><label>公司地址</label><input type="text" class="form-control" id="supAddress" placeholder="详细地址"></div>
+        <div class="form-group full"><label>备注</label><textarea class="form-control" id="supRemark" placeholder="其他信息..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('addSupplierModal')">取消</button>
+      <button class="btn btn-primary" onclick="addSupplier()">保存供应商</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal-overlay" id="addCategoryModal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header"><div class="modal-title">🗂️ 新建供应商分类</div><button class="modal-close" onclick="closeModal('addCategoryModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>分类名称 *</label><input type="text" class="form-control" id="catName" placeholder="如：石材供应商、瓷砖供应商"></div>
+        <div class="form-group"><label>分类图标（emoji）</label><input type="text" class="form-control" id="catIcon" placeholder="🪨" maxlength="4"></div>
+        <div class="form-group full"><label>材料子类别（每行一个）</label>
+          <textarea class="form-control" id="catSubItems" placeholder="天然大理石&#10;花岗岩&#10;人造石&#10;石英石" style="min-height:100px;"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('addCategoryModal')">取消</button>
+      <button class="btn btn-primary" onclick="addCategory()">创建分类</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Catalog Modal -->
+<div class="modal-overlay" id="addCatalogModal">
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-header"><div class="modal-title">📚 上传供应商图册</div><button class="modal-close" onclick="closeModal('addCatalogModal')">✕</button></div>
+    <div class="modal-body">
+
+      <!-- 封面图片上传 -->
+      <div class="upload-section-label">🖼️ 封面图片（选填，支持多图）</div>
+      <div class="upload-area" style="margin-bottom:8px;">
+        <div class="upload-icon">📸</div>
+        <div class="upload-text">点击上传图册封面图片</div>
+        <div class="upload-hint">支持 JPG、PNG、WEBP，可多选</div>
+        <input type="file" id="catalogImg" accept="image/*" multiple onchange="previewCatalogImg(this)">
+      </div>
+      <div id="catalogImgPreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+      <!-- 附件文件上传 -->
+      <div class="upload-section-label">📎 附件文件（支持 PDF / PPT / PPTX / DOC / DOCX / ZIP / RAR / JPG / PNG 等）</div>
+      <div class="upload-area catalog-file-area" id="catalogFileArea" ondragover="catalogFileDragOver(event)" ondragleave="catalogFileDragLeave(event)" ondrop="catalogFileDrop(event)">
+        <div class="upload-icon">📂</div>
+        <div class="upload-text">点击选择文件 或 拖拽到此处</div>
+        <div class="upload-hint">单个文件最大 50MB，可同时上传多个文件</div>
+        <input type="file" id="catalogFiles" multiple accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z,.jpg,.jpeg,.png,.webp,.gif,.bmp,.dwg,.cad" onchange="handleCatalogFiles(this)">
+      </div>
+      <!-- 已选文件列表 -->
+      <div id="catalogFileList" style="margin-top:8px;margin-bottom:16px;display:none;">
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">已选文件：</div>
+        <div id="catalogFileItems"></div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group"><label>图册名称 *</label><input type="text" class="form-control" id="catlogName" placeholder="材料图册名称"></div>
+        <div class="form-group"><label>绑定供应商 *</label><select class="form-control" id="catlogSupplier"><option value="">请选择供应商</option></select></div>
+        <div class="form-group"><label>所属分类</label><select class="form-control" id="catlogCategory"><option value="">请选择分类</option></select></div>
+        <div class="form-group"><label>批次号</label><input type="text" class="form-control" id="catlogBatch" placeholder="批次编号"></div>
+        <div class="form-group"><label>价格区间（元）</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" class="form-control" id="catlogPriceMin" placeholder="最低" style="flex:1;">
+            <span>-</span>
+            <input type="number" class="form-control" id="catlogPriceMax" placeholder="最高" style="flex:1;">
+          </div>
+        </div>
+        <div class="form-group"><label>库存状态</label>
+          <select class="form-control" id="catlogStock"><option value="有库存">有库存</option><option value="无库存">无库存</option><option value="待确认">待确认</option></select>
+        </div>
+        <div class="form-group full"><label>备注说明</label><textarea class="form-control" id="catlogRemark" placeholder="图册备注..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('addCatalogModal')">取消</button>
+      <button class="btn btn-primary" onclick="addCatalog()">💾 保存图册</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sample Modal -->
+<div class="modal-overlay" id="addSampleModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header"><div class="modal-title">🎨 新增定样留存</div><button class="modal-close" onclick="closeModal('addSampleModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="upload-area" style="margin-bottom:16px;">
+        <div class="upload-icon">📸</div><div class="upload-text">上传定样照片</div>
+        <input type="file" id="sampleImg" accept="image/*" onchange="previewSampleImg(this)">
+      </div>
+      <img id="sampleImgPreview" src="" style="width:100%;max-height:160px;object-fit:contain;border-radius:8px;display:none;margin-bottom:12px;">
+      <div class="form-grid">
+        <div class="form-group"><label>材料名称 *</label><input type="text" class="form-control" id="sampleName" placeholder="定样材料名称"></div>
+        <div class="form-group"><label>项目名称 *</label><input type="text" class="form-control" id="sampleProject" placeholder="所属项目"></div>
+        <div class="form-group"><label>定样空间</label><input type="text" class="form-control" id="sampleSpace" placeholder="如：客厅地面、主卧墙面"></div>
+        <div class="form-group"><label>供应商</label><select class="form-control" id="sampleSupplier"><option value="">请选择</option></select></div>
+        <div class="form-group full"><label>定样说明</label><textarea class="form-control" id="sampleNote" placeholder="颜色、纹理、工艺等描述..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('addSampleModal')">取消</button>
+      <button class="btn btn-primary" onclick="addSample()">保存定样</button>
+    </div>
+  </div>
+</div>
+
+<!-- Batch Import Modal -->
+<div class="modal-overlay" id="batchModal">
+  <div class="modal" style="max-width:550px;">
+    <div class="modal-header"><div class="modal-title">📋 批量入库</div><button class="modal-close" onclick="closeModal('batchModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="alert alert-info"><span class="alert-icon">ℹ️</span>上传Excel文件批量导入材料数据</div>
+      <div class="upload-area">
+        <div class="upload-icon">📊</div><div class="upload-text">上传Excel文件</div>
+        <div class="upload-hint">支持 .xlsx .xls 格式</div>
+        <input type="file" id="batchFile" accept=".xlsx,.xls" onchange="handleBatchImport(this)">
+      </div>
+      <div style="margin-top:12px;"><button class="btn btn-outline btn-sm" onclick="downloadTemplate()">📥 下载导入模板</button></div>
+      <div id="batchPreview" style="margin-top:12px;display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('batchModal')">取消</button>
+      <button class="btn btn-primary" id="confirmBatch" onclick="confirmBatchImport()" disabled>确认导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- Catalog Detail Modal -->
+<div class="modal-overlay" id="catalogDetailModal">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header"><div class="modal-title" id="catalogDetailTitle">图册详情</div><button class="modal-close" onclick="closeModal('catalogDetailModal')">✕</button></div>
+    <div class="modal-body" id="catalogDetailContent"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="deleteCatalogBtn" onclick="deleteCatalog()">🗑️ 删除</button>
+      <button class="btn btn-success btn-sm" onclick="closeModal('catalogDetailModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
